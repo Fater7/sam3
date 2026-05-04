@@ -20,6 +20,14 @@ def is_right_padded(mask):
     return (mask.long() == torch.sort(mask.long(), dim=-1)[0]).all()
 
 
+def assert_right_padded(mask):
+    is_padded = is_right_padded(mask)
+    if mask.device.type == "cuda":
+        torch._assert_async(is_padded)
+    else:
+        assert is_padded.item()
+
+
 def concat_padded_sequences(seq1, mask1, seq2, mask2, return_index: bool = False):
     """
     Concatenates two right-padded sequences, such that the resulting sequence
@@ -45,8 +53,8 @@ def concat_padded_sequences(seq1, mask1, seq2, mask2, return_index: bool = False
     assert seq1_length == mask1.size(1)
     assert seq2_length == mask2.size(1)
 
-    torch._assert_async(is_right_padded(mask1))
-    torch._assert_async(is_right_padded(mask2))
+    assert_right_padded(mask1)
+    assert_right_padded(mask2)
 
     actual_seq1_lengths = (~mask1).sum(dim=-1)
     actual_seq2_lengths = (~mask2).sum(dim=-1)
