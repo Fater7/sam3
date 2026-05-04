@@ -354,6 +354,9 @@ class TransformerDecoder(nn.Module):
             assert coords_h.shape == (H,)
             assert coords_w.shape == (W,)
 
+        coords_h = coords_h.to(device=reference_boxes.device)
+        coords_w = coords_w.to(device=reference_boxes.device)
+
         deltas_y = coords_h.view(1, -1, 1) - boxes_xyxy.reshape(-1, 1, 4)[:, :, 1:4:2]
         deltas_y = deltas_y.view(bs, num_queries, -1, 2)
         deltas_x = coords_w.view(1, -1, 1) - boxes_xyxy.reshape(-1, 1, 4)[:, :, 0:3:2]
