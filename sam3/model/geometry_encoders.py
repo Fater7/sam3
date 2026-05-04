@@ -596,18 +596,21 @@ class SequenceGeometryEncoder(nn.Module):
             points_embed = proj
 
         if self.points_pool_project is not None:
-            # points are [Num_points, bs, 2], normalized in [0, 1]
-            # the grid needs to be [Bs, H_out, W_out, 2] normalized in [-1,1]
-            # Will take H_out = num_points, w_out = 1
-            grid = points.transpose(0, 1).unsqueeze(2)
-            # re normalize to [-1, 1]
-            grid = (grid * 2) - 1
-            sampled = torch.nn.functional.grid_sample(
-                img_feats, grid, align_corners=False
-            )
-            assert list(sampled.shape) == [bs, self.d_model, n_points, 1]
-            sampled = sampled.squeeze(-1).permute(2, 0, 1)
-            proj = self.points_pool_project(sampled)
+            if n_points == 0:
+                proj = points.new_zeros((n_points, bs, self.d_model))
+            else:
+                # points are [Num_points, bs, 2], normalized in [0, 1]
+                # the grid needs to be [Bs, H_out, W_out, 2] normalized in [-1,1]
+                # Will take H_out = num_points, w_out = 1
+                grid = points.transpose(0, 1).unsqueeze(2)
+                # re normalize to [-1, 1]
+                grid = (grid * 2) - 1
+                sampled = torch.nn.functional.grid_sample(
+                    img_feats, grid, align_corners=False
+                )
+                assert list(sampled.shape) == [bs, self.d_model, n_points, 1]
+                sampled = sampled.squeeze(-1).permute(2, 0, 1)
+                proj = self.points_pool_project(sampled)
             if points_embed is None:
                 points_embed = proj
             else:
@@ -639,31 +642,36 @@ class SequenceGeometryEncoder(nn.Module):
             boxes_embed = proj
 
         if self.boxes_pool_project is not None:
-            H, W = img_feats.shape[-2:]
-
-            # boxes are [Num_boxes, bs, 4], normalized in [0, 1]
-            # We need to denormalize, and convert to [x, y, x, y]
-            boxes_xyxy = box_cxcywh_to_xyxy(boxes)
-            scale = torch.tensor([W, H, W, H], dtype=boxes_xyxy.dtype)
-            if boxes_xyxy.device.type == "cuda":
-                scale = scale.pin_memory().to(
-                    device=boxes_xyxy.device, non_blocking=True
-                )
+            if n_boxes == 0:
+                proj = boxes.new_zeros((n_boxes, bs, self.d_model))
             else:
-                scale = scale.to(device=boxes_xyxy.device)
-            scale = scale.view(1, 1, 4)
-            boxes_xyxy = boxes_xyxy * scale
-            sampled = torchvision.ops.roi_align(
-                img_feats, boxes_xyxy.float().transpose(0, 1).unbind(0), self.roi_size
-            )
-            assert list(sampled.shape) == [
-                bs * n_boxes,
-                self.d_model,
-                self.roi_size,
-                self.roi_size,
-            ]
-            proj = self.boxes_pool_project(sampled)
-            proj = proj.view(bs, n_boxes, self.d_model).transpose(0, 1)
+                H, W = img_feats.shape[-2:]
+
+                # boxes are [Num_boxes, bs, 4], normalized in [0, 1]
+                # We need to denormalize, and convert to [x, y, x, y]
+                boxes_xyxy = box_cxcywh_to_xyxy(boxes)
+                scale = torch.tensor([W, H, W, H], dtype=boxes_xyxy.dtype)
+                if boxes_xyxy.device.type == "cuda":
+                    scale = scale.pin_memory().to(
+                        device=boxes_xyxy.device, non_blocking=True
+                    )
+                else:
+                    scale = scale.to(device=boxes_xyxy.device)
+                scale = scale.view(1, 1, 4)
+                boxes_xyxy = boxes_xyxy * scale
+                sampled = torchvision.ops.roi_align(
+                    img_feats,
+                    boxes_xyxy.float().transpose(0, 1).unbind(0),
+                    self.roi_size,
+                )
+                assert list(sampled.shape) == [
+                    bs * n_boxes,
+                    self.d_model,
+                    self.roi_size,
+                    self.roi_size,
+                ]
+                proj = self.boxes_pool_project(sampled)
+                proj = proj.view(bs, n_boxes, self.d_model).transpose(0, 1)
             if boxes_embed is None:
                 boxes_embed = proj
             else:
