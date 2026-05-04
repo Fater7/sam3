@@ -279,9 +279,7 @@ class TransformerDecoder(nn.Module):
 
             if resolution is not None and stride is not None:
                 feat_size = resolution // stride
-                coords_h, coords_w = self._get_coords(
-                    feat_size, feat_size, device="cuda"
-                )
+                coords_h, coords_w = self._get_coords(feat_size, feat_size, device="cpu")
                 self.compilable_cord_cache = (coords_h, coords_w)
                 self.compilable_stored_size = (feat_size, feat_size)
 
