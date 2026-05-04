@@ -98,7 +98,8 @@ class PositionEmbeddingSine(nn.Module):
         cache_key = None
         cache_key = (x.shape[-2], x.shape[-1])
         if cache_key in self.cache:
-            return self.cache[cache_key][None].repeat(x.shape[0], 1, 1, 1)
+            cached_pos = self.cache[cache_key].to(device=x.device, dtype=x.dtype)
+            return cached_pos[None].repeat(x.shape[0], 1, 1, 1)
         y_embed = (
             torch.arange(1, x.shape[-2] + 1, dtype=torch.float32, device=x.device)
             .view(1, -1, 1)
